@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>LinkShrinker - URL Shortener</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 2rem;
+      background: #f7f9fc;
+      color: #333;
+    }
+    h1 {
+      color: #2c3e50;
+    }
+    input[type="text"] {
+      padding: 10px;
+      width: 60%;
+      max-width: 400px;
+      border: 1px solid #ccc;
+      border-radius: 5px;
+    }
+    button {
+      padding: 10px 20px;
+      margin: 10px 5px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #2980b9;
+    }
+    #result {
+      margin-top: 20px;
+      font-size: 1.1em;
+    }
+    #history {
+      margin-top: 30px;
+      text-align: left;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      background: #fff;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+    .history-item {
+      margin-bottom: 10px;
+    }
+    canvas {
+      margin-top: 15px;
+    }
+    footer {
+      margin-top: 3rem;
+      font-size: 0.9em;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🔗 LinkShrinker</h1>
+  <p>Paste a long URL below to shrink it!</p>
+  <input type="text" id="longUrl" placeholder="Enter your long URL here">
+  <button onclick="shortenUrl()">Shrink</button>
+
+  <div id="result"></div>
+  <canvas id="qrcode"></canvas>
+
+  <div id="history">
+    <h3>🔍 History</h3>
+    <div id="historyList"></div>
+  </div>
+
+  <footer>
+    Made with ❤️ by LinkShrinker | Uses <a href="https://shrtco.de/docs/" target="_blank">shrtco.de API</a>
+  </footer>
+
+  <!-- QR code library (lightweight) -->
+  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+
+  <script>
+    function loadHistory() {
+      const history = JSON.parse(localStorage.getItem('shortLinks')) || [];
+      const historyList = document.getElementById('historyList');
+      historyList.innerHTML = '';
+      history.slice().reverse().forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'history-item';
+        div.innerHTML = `
+          <strong>Original:</strong> <a href="${item.original}" target="_blank">${item.original}</a><br>
+          <strong>Short:</strong> <a href="${item.short}" target="_blank">${item.short}</a><br><br>
+        `;
+        historyList.appendChild(div);
+      });
+    }
+
+    async function shortenUrl() {
+      const urlInput = document.getElementById('longUrl');
+      const longUrl = urlInput.value.trim();
+      const resultDiv = document.getElementById('result');
+      const qrCanvas = document.getElementById('qrcode');
+
+      if (!longUrl) {
+        resultDiv.style.color = 'red';
+        resultDiv.textContent = "Please enter a URL!";
+        return;
+      }
+
+      resultDiv.textContent = "Shrinking...";
+      resultDiv.style.color = "#333";
+      qrCanvas.getContext('2d').clearRect(0, 0, qrCanvas.width, qrCanvas.height);
+
+      try {
+        const res = await fetch(`https://api.shrtco.de/v2/shorten?url=${encodeURIComponent(longUrl)}`);
+        const data = await res.json();
+
+        if (data.ok) {
+          const shortUrl = data.result.full_short_link;
+          resultDiv.innerHTML = `
+            ✅ Short URL: <a href="${shortUrl}" target="_blank">${shortUrl}</a><br>
+            <button onclick="copyToClipboard('${shortUrl}')">📋 Copy</button>
+          `;
+          resultDiv.style.color = "green";
+
+          // Generate QR code
+          QRCode.toCanvas(qrCanvas, shortUrl, { width: 150 });
+
+          // Save to history
+          const stored = JSON.parse(localStorage.getItem('shortLinks')) || [];
+          stored.push({ original: longUrl, short: shortUrl });
+          localStorage.setItem('shortLinks', JSON.stringify(stored));
+          loadHistory();
+        } else {
+          throw new Error("Invalid URL or API error.");
+        }
+      } catch (error) {
+        resultDiv.style.color = "red";
+        resultDiv.textContent = "Failed to shorten URL. Try again.";
+      }
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert("Copied to clipboard!");
+      });
+    }
+
+    loadHistory();
+  </script>
+
+</body>
+</html>
